@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # PO file translator (OpenAI-powered)
 
 Small utility to translate .po files (gettext) using the OpenAI API. The tool was built to translate UI strings from English or German into Norwegian Bokmål, Swedish, or Danish while preserving placeholders, HTML tags, and formatting.
@@ -107,250 +108,99 @@ Before uploading to GitHub
 If a run is interrupted or you need to re-run only missing translations:
 
 1. Edit/inspect the partially translated `.po` and identify missing `msgstr` entries.
-2. Re-run the script with `--force` or `--source-lang`/`--batch-size` tuned to re-translate only what you need. Example:
+ # POTranslation
 
-```powershell
-python src/po_translate_en_to_nb.py "partial.po" "partial_retry.po" --batch-size 1 --model gpt-4o --force --target-lang nb
-```
+ Automatic PO (Poedit) file translator using the OpenAI API.
 
-This script logs any items that failed to `failed_items.log` and raw model responses to `raw_responses.log` to aid debugging.
+ This project provides a small CLI tool to translate gettext `.po` files. It is designed to
+ handle mixed German/English source strings and translate them into a chosen target language
+ (Norwegian Bokmål, Swedish, or Danish) while preserving placeholders, HTML tags and formatting.
 
-## Troubleshooting
+ Key features
 
-- If you see parsing errors in `raw_responses.log`, increase retries or reduce `--batch-size`.
-- If translations are incorrect in context, consider re-running problematic entries with additional context or a glossary.
+ - Per-entry source detection (English vs German) with a `--source-lang` override
+ - Target languages: `nb` (Norwegian Bokmål), `sv` (Swedish), `da` (Danish)
+ - Preserves placeholders (printf `%s`, `%d`, `%%`), Python/ICU `{name}`, numeric `{0}`, and HTML tags
+ - Batch processing with retry and per-item fallback
+ - Logs unparsable model responses to `raw_responses.log` and failed items to `failed_items.log`
 
-## License
+ Quick start
 
-This project is provided as-is for internal use. Add a license file if you plan to publish.
+ Requirements
 
----
-If you want, I can add an automated placeholder-check tool and a small test that validates all placeholders are preserved across translations before uploading to GitHub.
-# PO File Translator: English to Norwegian Bokmål
+ - Python 3.10+
+ - OpenAI API key
 
-A Python tool that automatically translates PO (Poedit) files from English to Norwegian Bokmål using OpenAI's API.
+ Install in a virtual environment:
 
-## Features
+ ```powershell
+ python -m venv .venv
+ .\.venv\Scripts\Activate.ps1
+ pip install -r requirements.txt
+ ```
 
-- 🔄 Translates English msgstr entries to Norwegian Bokmål
-- 🛡️ Preserves all formatting, placeholders, and metadata
-- 🎯 Maintains capitalization and punctuation style
-- 📝 Keeps comments, msgctxt, and developer notes intact
-- 🔧 Handles printf-style (%s, %d), Python/ICU ({name}, {0}), and HTML placeholders
-- 🚀 Batch processing for efficient API usage
-- ⚡ Retry logic for robust operation
+ Create a local `.env` file with your API key (DO NOT commit this file):
 
-## Prerequisites
+ ```
+ OPENAI_API_KEY="sk-..."
+ ```
 
-- Python 3.7+
-- OpenAI API key
-- PO files with English text to translate
+ Usage
 
-## Installation
+ ```powershell
+ python src/po_translate_en_to_nb.py "input.po" "output.po" --target-lang nb
+ ```
 
-1. Clone this repository:
-```bash
-git clone <repository-url>
-cd translate_poedit
-```
-
-2. Create and activate a virtual environment:
-```bash
-python -m venv venv
-# On Windows:
-venv\Scripts\activate
-# On macOS/Linux:
-source venv/bin/activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Set your OpenAI API key:
-```bash
-# On Windows:
-set OPENAI_API_KEY=your_api_key_here
-
-# On macOS/Linux:
-export OPENAI_API_KEY=your_api_key_here
-```
-
-## Usage
-
-### Basic Usage
-
-```bash
-python src/po_translate_en_to_nb.py input.po output.po
-```
-
-### Advanced Options
-
-```bash
-python src/po_translate_en_to_nb.py input.po output.po \
-    --model gpt-4o \
-    --batch-size 50 \
-    --verbose
-```
-
-### Options
+ Important options
 
-- `--model`: OpenAI model to use (default: `gpt-4o`)
-- `--batch-size`: Number of entries per API call (default: 50)
-- `--verbose`: Enable verbose output
+ - `--model`       : OpenAI model (default `gpt-4o`)
+ - `--batch-size`  : Items per API call (default 50)
+ - `--force`       : Translate all entries (prefer `msgstr` if present)
+ - `--source-lang` : `auto`, `en`, or `de` — controls source detection
+ - `--target-lang` : `nb`, `sv`, or `da` — target language
 
-## How It Works
+ Verification
 
-The tool processes PO files with the following logic:
+ After a run, open the generated `.po` in Poedit and spot-check.
+ Run the simple Python snippet below to count empty translations:
 
-1. **English Detection**: Identifies English text using heuristics (ASCII characters + common English UI words)
-2. **Translation Strategy**:
-   - If `msgstr` contains English → translates it to Norwegian
-   - If `msgstr` is empty and `msgid` looks English → translates `msgid` and uses as `msgstr`
-   - Otherwise → leaves entry unchanged
-3. **Preservation**: Maintains all PO file structure, comments, and formatting
-4. **Batch Processing**: Groups translations for efficient API usage
-
-## Examples
-
-### Input PO Entry
-```po
-#. Developer comment
-#: source/file.php:123
-msgctxt "UI context"
-msgid "Kundenstimmen - Archiv"
-msgstr "Customer reviews archive"
-```
-
-### Output PO Entry
-```po
-#. Developer comment
-#: source/file.php:123
-msgctxt "UI context"
-msgid "Kundenstimmen - Archiv"
-msgstr "Arkiv for kundeanmeldelser"
-```
-
-## Translation Rules
-
-The tool follows strict Norwegian Bokmål translation guidelines:
+ ```powershell
+ python - <<'PY'
+ import polib
+ p = polib.pofile(r'translated_nb_NO_gpt4o_all.po')
+ empty = [e for e in p if not e.msgstr.strip() and e.msgid!='']
+ print('empty:', len(empty))
+ for e in empty[:20]:
+     print(e.msgid)
+ PY
+ ```
 
-- ✅ Standard Norwegian Bokmål terminology
-- ✅ Preserves placeholder formatting: `%s`, `{name}`, `%d`, etc.
-- ✅ Maintains HTML tags and URLs unchanged
-- ✅ Keeps original capitalization style (Title Case → Title Case)
-- ✅ Consistent technical term translation
-
-## Project Structure
+ Security / git
 
-```
-translate_poedit/
-├── src/
-│   └── po_translate_en_to_nb.py    # Main translation script
-├── tests/                          # Unit tests
-├── docs/                          # Documentation
-├── examples/                      # Example PO files
-├── Internal_documentation/        # Project documentation
-├── requirements.txt               # Python dependencies
-├── .gitignore                    # Git ignore rules
-├── CHANGELOG.md                  # Version history
-└── README.md                     # This file
-```
+ Do NOT commit secrets. The `.gitignore` is configured to exclude:
 
-## Development
+ - `.env`, `.venv`/`venv/`
+ - generated translations `translated_*.po`
+ - logs: `raw_responses.log`, `failed_items.log`
+ - `Internal_documentation/`
 
-### Running Tests
-```bash
-pytest tests/
-```
+ Before publishing to GitHub, verify there are no sensitive files staged:
 
-### Code Formatting
-```bash
-black src/
-flake8 src/
-```
+ ```powershell
+ git check-ignore -v .env translated_*.po raw_responses.log failed_items.log "Internal_documentation/*"
+ git status --short
+ ```
 
-### Type Checking
-```bash
-mypy src/
-```
+ Resume workflow
 
-## Dependencies
+ If a run fails or you need to retry only missing items, re-run with `--force` and `--batch-size` tuned (smaller for reliability).
+ Failed items are appended to `failed_items.log`.
 
-### Core
-- `openai`: OpenAI API client
-- `polib`: PO file parsing and manipulation
-- `tenacity`: Retry logic for API calls
+ Next steps I can help with
 
-### Development (Optional)
-- `pytest`: Testing framework
-- `black`: Code formatter
-- `flake8`: Linting
-- `mypy`: Type checking
+ - Add an automated placeholder/format-preservation check script (recommended before publishing)
+ - Run final pre-publish checks and push again if you want me to complete the Git push
 
-## Configuration
+ License
 
-### Environment Variables
-
-- `OPENAI_API_KEY` (required): Your OpenAI API key
-
-### Model Recommendations
-
-- **Quality**: `gpt-4o` (default) - Best translation quality
-- **Speed**: `gpt-4o-mini` - Faster and more cost-effective
-- **Legacy**: `gpt-3.5-turbo` - Budget option
-
-## Cost Estimation
-
-Translation costs depend on:
-- Number of strings to translate
-- Model choice (gpt-4o vs gpt-4o-mini)
-- String length
-
-Example: ~1000 UI strings typically cost $0.50-$2.00 with gpt-4o-mini.
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"Please set OPENAI_API_KEY"**
-   - Ensure your API key is set as an environment variable
-
-2. **"Failed to load PO file"**
-   - Verify the input file path and encoding (should be UTF-8)
-
-3. **API Rate Limits**
-   - Reduce `--batch-size` or add delays between requests
-
-4. **Translation Quality Issues**
-   - Try a different model (gpt-4o for best quality)
-   - Check if technical terms need custom handling
-
-### Debug Mode
-```bash
-python src/po_translate_en_to_nb.py input.po output.po --verbose
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-[Add your license here]
-
-## Support
-
-For issues and questions:
-- Check the [troubleshooting section](#troubleshooting)
-- Review the [examples](examples/)
-- Open an issue on GitHub
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for version history and updates.
+ Add a license file if you plan to publish this repository publicly.
