@@ -3,6 +3,10 @@ openai>=1.0.0
 polib>=1.1.1
 tenacity>=8.2.0
 tqdm>=4.64.0
+python-dotenv>=1.0.0
+
+# Web frontend
+streamlit>=1.30.0
 
 # Development dependencies (optional)
 pytest>=7.0.0
