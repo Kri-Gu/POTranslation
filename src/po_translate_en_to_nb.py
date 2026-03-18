@@ -4,7 +4,11 @@
 """
 Translate .po file UI strings using the OpenAI API.
 
-Supports English and German source text → Norwegian Bokmål / Swedish / Danish.
+Supports English and German source text → target languages:
+  Scandinavian : Norwegian Bokmål (nb), Swedish (sv), Danish (da)
+  Central/East : Polish (pl), Czech (cs), Slovak (sk), Hungarian (hu),
+                 Croatian (hr), Slovenian (sl), Romanian (ro),
+                 Bulgarian (bg), Serbian (sr)
 
 - Preserves: comments, msgctxt, metadata, placeholders, punctuation, capitalization, HTML tags.
 - Validates that placeholders survive translation and warns if any are dropped.
@@ -12,7 +16,7 @@ Supports English and German source text → Norwegian Bokmål / Swedish / Danish
 - Accepts a domain context file (--context-file) for specialised terminology.
 
 Usage:
-  python po_translate_en_to_nb.py input.po output.po --model gpt-4.1 --context-file context.json
+  python po_translate_en_to_nb.py input.po output.po --target-lang pl --model gpt-4.1 --context-file context.json
 """
 
 import os
@@ -110,11 +114,7 @@ def make_system_prompt(target_lang: str = "nb", domain_context: str = "") -> str
     """
     Build a rich system prompt that tells the model exactly how to behave.
     """
-    lang_map = {
-        "nb": "Norwegian Bokmål",
-        "sv": "Swedish",
-        "da": "Danish",
-    }
+    lang_map = {code: name for code, name in TARGET_LANGUAGES.items()}
     target_name = lang_map.get(target_lang, target_lang)
 
     parts = [
@@ -142,62 +142,184 @@ def make_system_prompt(target_lang: str = "nb", domain_context: str = "") -> str
     return "\n".join(parts)
 
 
-def make_user_prompt(pairs: List[Dict[str, str]], target_lang: str = "nb") -> str:
-    """
-    Build the user message containing items to translate, with few-shot examples.
-    """
-    lang_map = {
-        "nb": "Norwegian Bokmål",
-        "sv": "Swedish",
-        "da": "Danish",
-    }
-    target_name = lang_map.get(target_lang, target_lang)
-
-    # Provide examples tailored for the requested target language
-    if target_lang == "nb":
-        examples = {
-            "translations": [
-                {"id": "ex1", "translation": "Godta alle"},
-                {"id": "ex2", "translation": "Innstillinger for informasjonskapsler"},
-                {"id": "ex3", "translation": "Arkiv for kundeanmeldelser"},
-                {"id": "ex4", "translation": "Velg %s produkter"},
-            ]
-        }
-        example_items = [
+# Per-language few-shot examples used in make_user_prompt
+_FEWSHOT_EXAMPLES: Dict[str, Dict] = {
+    "nb": {
+        "items": [
             {"id": "ex1", "text": "Accept All", "lang": "en"},
             {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
             {"id": "ex3", "text": "Kundenstimmen - Archiv", "lang": "de"},
             {"id": "ex4", "text": "Select %s products", "lang": "en"},
-        ]
-    elif target_lang == "sv":
-        examples = {
-            "translations": [
-                {"id": "ex1", "translation": "Acceptera alla"},
-                {"id": "ex2", "translation": "Cookie-inställningar"},
-                {"id": "ex3", "translation": "Arkiv för kundomdömen"},
-            ]
-        }
-        example_items = [
+        ],
+        "translations": ["Godta alle", "Innstillinger for informasjonskapsler", "Arkiv for kundeanmeldelser", "Velg %s produkter"],
+    },
+    "sv": {
+        "items": [
             {"id": "ex1", "text": "Accept All", "lang": "en"},
             {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
             {"id": "ex3", "text": "Kundenstimmen - Archiv", "lang": "de"},
-        ]
-    elif target_lang == "da":
-        examples = {
-            "translations": [
-                {"id": "ex1", "translation": "Accepter alle"},
-                {"id": "ex2", "translation": "Cookie-indstillinger"},
-                {"id": "ex3", "translation": "Arkiv for kundeanmeldelser"},
-            ]
-        }
-        example_items = [
+        ],
+        "translations": ["Acceptera alla", "Cookie-inställningar", "Arkiv för kundomdömen"],
+    },
+    "da": {
+        "items": [
             {"id": "ex1", "text": "Accept All", "lang": "en"},
             {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
             {"id": "ex3", "text": "Kundenstimmen - Archiv", "lang": "de"},
-        ]
+        ],
+        "translations": ["Accepter alle", "Cookie-indstillinger", "Arkiv for kundeanmeldelser"],
+    },
+    "pl": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Zaakceptuj wszystkie", "Ustawienia plików cookie", "Wybierz %s produktów"],
+    },
+    "cs": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Přijmout vše", "Nastavení cookies", "Vybrat %s produktů"],
+    },
+    "sk": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Prijať všetko", "Nastavenia cookies", "Vybrať %s produktov"],
+    },
+    "hu": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Összes elfogadása", "Cookie-beállítások", "%s termék kiválasztása"],
+    },
+    "hr": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Prihvati sve", "Postavke kolačića", "Odaberi %s proizvoda"],
+    },
+    "sl": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Sprejmi vse", "Nastavitve piškotkov", "Izberi %s izdelkov"],
+    },
+    "ro": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Acceptă toate", "Setări cookie-uri", "Selectează %s produse"],
+    },
+    "bg": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Приеми всички", "Настройки за бисквитки", "Изберете %s продукта"],
+    },
+    "sr": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Prihvati sve", "Podešavanja kolačića", "Izaberi %s proizvoda"],
+    },
+    "bs": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Prihvati sve", "Postavke kolačića", "Odaberi %s proizvoda"],
+    },
+    "fr": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Tout accepter", "Paramètres des cookies", "Sélectionner %s produits"],
+    },
+    "es": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Aceptar todo", "Configuración de cookies", "Seleccionar %s productos"],
+    },
+    "ru": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Принять все", "Настройки файлов cookie", "Выбрать %s товаров"],
+    },
+    "el": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Αποδοχή όλων", "Ρυθμίσεις cookies", "Επιλογή %s προϊόντων"],
+    },
+    "ka": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["ყველის მიღება", "ქუქი-ფაილების პარამეტრები", "%s პროდუქტის არჩევა"],
+    },
+    "me": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Prihvati sve", "Podešavanja kolačića", "Izaberi %s proizvoda"],
+    },
+}
+
+
+def make_user_prompt(pairs: List[Dict[str, str]], target_lang: str = "nb") -> str:
+    """
+    Build the user message containing items to translate, with few-shot examples.
+    """
+    lang_map = {code: name for code, name in TARGET_LANGUAGES.items()}
+    target_name = lang_map.get(target_lang, target_lang)
+
+    # Provide examples tailored for the requested target language
+    fewshot = _FEWSHOT_EXAMPLES.get(target_lang)
+    if fewshot:
+        example_items = fewshot["items"]
+        examples = {
+            "translations": [
+                {"id": item["id"], "translation": t}
+                for item, t in zip(example_items, fewshot["translations"])
+            ]
+        }
     else:
-        examples = {"translations": [{"id": "ex1", "translation": "Accept All"}]}
         example_items = [{"id": "ex1", "text": "Accept All", "lang": "en"}]
+        examples = {"translations": [{"id": "ex1", "translation": "Accept All"}]}
 
     prompt_parts = [
         f"Translate the following items into {target_name}.",
@@ -335,24 +457,74 @@ AVAILABLE_MODELS = [
 ]
 
 TARGET_LANGUAGES = {
+    # Scandinavian
     "nb": "Norwegian Bokmål",
     "sv": "Swedish",
     "da": "Danish",
+    # Western European
+    "fr": "French",
+    "es": "Spanish",
+    # Central / South-East European
+    "pl": "Polish",
+    "cs": "Czech",
+    "sk": "Slovak",
+    "hu": "Hungarian",
+    "hr": "Croatian",
+    "bs": "Bosnian",
+    "sr": "Serbian",
+    "sl": "Slovenian",
+    "ro": "Romanian",
+    # East European / other
+    "bg": "Bulgarian",
+    "ru": "Russian",
+    "ka": "Georgian",
+    # Greek
+    "el": "Greek",
+    # Montenegrin
+    "me": "Montenegrin",
 }
 
 SOURCE_LANGUAGES = ["auto", "en", "de"]
 
 # Map common aliases to our canonical language codes
+# Also covers locale-style codes (cs_CZ → cs, etc.) — handled in _normalise_lang
 _LANG_ALIASES = {
+    # Scandinavian
     "no": "nb", "norwegian": "nb", "norsk": "nb",
     "se": "sv", "swedish": "sv", "svenska": "sv",
     "dk": "da", "danish": "da", "dansk": "da",
+    # Western European
+    "french": "fr", "français": "fr",
+    "spanish": "es", "español": "es",
+    # Central / South-East European
+    "polish": "pl", "polski": "pl",
+    "czech": "cs", "cz": "cs", "čeština": "cs",
+    "slovak": "sk", "slovenčina": "sk",
+    "hungarian": "hu", "magyar": "hu",
+    "croatian": "hr", "hrvatski": "hr",
+    "bosnian": "bs", "bosanski": "bs",
+    "serbian": "sr", "srpski": "sr",
+    "slovenian": "sl", "slovenščina": "sl",
+    "romanian": "ro", "română": "ro",
+    # East European
+    "bulgarian": "bg", "български": "bg",
+    "russian": "ru", "русский": "ru",
+    # Greek
+    "greek": "el", "ελληνικά": "el",
+    # Georgian
+    "georgian": "ka", "kartuli": "ka",
+    # Montenegrin
+    "montenegrin": "me", "crnogorski": "me",
 }
 
 
 def _normalise_lang(code: str) -> str:
-    """Map common aliases (no, dk, se) to canonical codes (nb, da, sv)."""
-    return _LANG_ALIASES.get(code.lower().strip(), code.lower().strip())
+    """Map common aliases and locale codes (e.g. cs_CZ, pl_PL) to canonical codes."""
+    c = code.lower().strip()
+    # Strip locale suffix: cs_cz → cs, fr_fr → fr, etc.
+    if "_" in c:
+        c = c.split("_")[0]
+    return _LANG_ALIASES.get(c, c)
 
 
 def get_defaults() -> Dict:
@@ -631,10 +803,10 @@ def main():
             pbar.close()
 
     # --- Summary ---
-    print(f"\n✅ Successfully translated {result['translated']}/{result['total_to_translate']} entries")
+    print(f"\n[OK] Successfully translated {result['translated']}/{result['total_to_translate']} entries")
 
     if result["placeholder_warnings"]:
-        print(f"\n⚠️  {len(result['placeholder_warnings'])} translation(s) have missing placeholders:")
+        print(f"\n[WARN] {len(result['placeholder_warnings'])} translation(s) have missing placeholders:")
         for pw in result["placeholder_warnings"][:20]:
             print(f"  ID {pw['id']}: missing {pw['missing']}")
             print(f"    Source:      {pw['source'][:80]}")
@@ -650,9 +822,9 @@ def main():
         with open("failed_items.log", "a", encoding="utf-8") as f:
             for fi in result["failed"]:
                 f.write(json.dumps(fi, ensure_ascii=False) + "\n")
-        print(f"⚠️  {len(result['failed'])} item(s) failed — see failed_items.log")
+        print(f"[WARN] {len(result['failed'])} item(s) failed -- see failed_items.log")
 
-    print(f"✅ Wrote: {result['output_path']}")
+    print(f"[OK] Wrote: {result['output_path']}")
 
 if __name__ == "__main__":
     main()

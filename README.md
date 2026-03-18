@@ -1,18 +1,34 @@
-# PO File Translator (OpenAI-powered)
+# Translation File Translator (OpenAI-powered)
 
-Translate `.po` (gettext/Poedit) files using the OpenAI API. Built for translating UI strings and technical content from English or German into Norwegian Bokmål, Swedish, or Danish — while preserving placeholders, HTML tags, and formatting.
+Translate `.po` (gettext/Poedit) and `.xlf` (XLIFF 1.2) files using the OpenAI API. Built for translating UI strings and technical content from English or German into Norwegian Bokmål, Swedish, Danish, and other European languages — while preserving placeholders, inline markup, HTML tags, and formatting.
 
 ## Features
 
 - **Web UI (Streamlit)** — upload, configure, translate, and download without touching the command line
+- **Multi-format support** — `.po` (gettext/Poedit) and `.xlf` (XLIFF 1.2) with correct round-trip handling
 - **High-quality translation** via `gpt-4.1` or `gpt-5.2` (configurable) with JSON mode for reliable output
 - **Domain context support** — feed a context file so the model understands your product domain
 - **Per-entry source detection** (English vs German) with a `--source-lang` override
-- **Target languages**: `nb` (Norwegian Bokmål), `sv` (Swedish), `da` (Danish)
+- **Target languages**: `nb` (Norwegian Bokmål), `sv` (Swedish), `da` (Danish), `pl`, `cs`, `sk`, `hu`, `hr`, `sl`, `ro`, `bg`, `sr`
 - **Placeholder preservation** with post-translation validation (`%s`, `%d`, `{name}`, HTML tags, URLs)
+- **XLIFF inline markup preservation** — `<g>` elements and their attributes survive translation unchanged
 - **Batch processing** with retry and per-item fallback on failure
 - **Dry-run mode** to preview what will be translated before spending API credits
 - Logs unparsable responses to `raw_responses.log` and failed items to `failed_items.log`
+
+## Documentation
+
+| Document | Description |
+|---|---|
+| [docs/startup-guide.md](docs/startup-guide.md) | Setup, launch, CLI usage, and troubleshooting |
+| [docs/architecture.md](docs/architecture.md) | Code structure, modules, data flow |
+| [docs/feature-roadmap.md](docs/feature-roadmap.md) | Prioritised feature list with status |
+| [docs/prompt-guide.md](docs/prompt-guide.md) | Prompt design and optimisation recommendations |
+| [docs/format-support.md](docs/format-support.md) | Supported formats and implementation notes (IDML, HTML, Markdown, DITA, etc.) |
+| [docs/product-requirements.md](docs/product-requirements.md) | Product scope, users, jobs to be done, requirements |
+| [docs/implementation-plan.md](docs/implementation-plan.md) | Phased execution plan and recommended build order |
+| [docs/testing-and-qa.md](docs/testing-and-qa.md) | Test strategy, QA checklist, and acceptance criteria |
+| [docs/deployment-and-ops.md](docs/deployment-and-ops.md) | Local operation, hosted path, and operational concerns |
 
 ## Quick start
 
@@ -70,6 +86,8 @@ You can also enter your API key directly in the sidebar (it is never stored).
 
 ## CLI usage
 
+### `.po` files
+
 Basic usage:
 
 ```powershell
@@ -109,6 +127,20 @@ Dry run (preview without API calls):
 ```powershell
 python src/po_translate_en_to_nb.py "Internal_documentation/Poedit files/nb_NO.po" "output.po" --force --target-lang nb --dry-run
 ```
+
+### `.xlf` files (XLIFF 1.2)
+
+```powershell
+python src/xliff_translate.py "input.xlf" "output.xlf" --target-lang nb
+```
+
+With domain context and a specific model:
+
+```powershell
+python src/xliff_translate.py "input.xlf" "output.xlf" --target-lang sv --model gpt-4.1 --context-file context.json
+```
+
+The XLIFF translator writes `state="translated"` on every `<target>` element and sets `target-language` on every `<file>` element, conforming to the XLIFF 1.2 standard.
 
 ### CLI options
 

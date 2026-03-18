@@ -155,6 +155,9 @@ placeholder_warnings.log
 # Internal documentation (may contain conversation history or sensitive notes)
 Internal_documentation/
 
+# Obsidian project vault (personal notes, business strategy, conversation logs)
+Project Vault - ProTranslate/
+
 # IDE files
 .vscode/
 .idea/

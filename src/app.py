@@ -24,6 +24,11 @@ from src.po_translate_en_to_nb import (
     load_context,
     get_defaults,
 )
+from src.xliff_translate import (
+    translate_xliff_file,
+    build_work_items_xliff,
+)
+import xml.etree.ElementTree as ET
 import polib
 
 # ─── Page config ───────────────────────────────────────────────────────────────
@@ -61,8 +66,8 @@ st.markdown("""
 
 
 def main():
-    st.title("🌍 PO File Translator")
-    st.caption("Translate .po (Poedit) files using OpenAI — preserving placeholders, HTML tags, and formatting.")
+    st.title("🌍 Translation File Translator")
+    st.caption("Translate .po (Poedit) and .xlf (XLIFF) files using OpenAI — preserving placeholders, inline markup, and formatting.")
 
     # Load user defaults from .env
     defaults = get_defaults()
@@ -158,97 +163,164 @@ def main():
 
     with col_upload:
         uploaded_file = st.file_uploader(
-            "Upload a .po file",
-            type=["po"],
-            help="Upload the .po file you want to translate.",
+            "Upload a .po or .xlf file",
+            type=["po", "xlf"],
+            help="Upload a .po (Poedit/gettext) or .xlf (XLIFF 1.2) file to translate.",
         )
 
-    # If a file is uploaded, show a preview
+    # Detect file type and route accordingly
     if uploaded_file is not None:
-        # Save to temp file so polib can read it
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".po", mode="wb") as tmp:
+        file_ext = Path(uploaded_file.name).suffix.lower()
+        is_xliff = file_ext in {".xlf", ".xliff"}
+
+        # ── Save upload to a temp file ──────────────────────────────────────
+        suffix = ".xlf" if is_xliff else ".po"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, mode="wb") as tmp:
             tmp.write(uploaded_file.getvalue())
             tmp_input = tmp.name
 
-        try:
-            po = polib.pofile(tmp_input, encoding="utf-8")
-        except Exception as e:
-            st.error(f"Failed to parse PO file: {e}")
-            return
+        # ── Parse and build work items ──────────────────────────────────────
+        if is_xliff:
+            try:
+                xliff_tree = ET.parse(tmp_input)
+            except ET.ParseError as e:
+                st.error(f"Failed to parse XLIFF file: {e}")
+                return
 
-        work_items, id_map, total_entries = build_work_items(
-            po, source_lang=source_lang, force=force
-        )
-
-        # File stats
-        with col_info:
-            st.metric("Total entries", total_entries)
-            st.metric("To translate", len(work_items))
-            estimated_calls = (len(work_items) + batch_size - 1) // batch_size
-            st.metric("API calls (est.)", estimated_calls)
-
-        # Preview tab
-        with st.expander("📄 Preview entries to translate", expanded=False):
-            preview_data = []
-            for item in work_items[:100]:
-                entry_obj, src_field = id_map[item["id"]]
-                preview_data.append({
-                    "Source lang": item["lang"],
-                    "Source field": src_field,
-                    "Text": item["text"][:120],
-                    "Current msgstr": entry_obj.msgstr[:120] if entry_obj.msgstr else "—",
-                })
-            st.dataframe(preview_data, use_container_width=True, hide_index=True)
-            if len(work_items) > 100:
-                st.caption(f"Showing first 100 of {len(work_items)} entries.")
-
-        # ─── Translate button ──────────────────────────────────────────────
-        st.divider()
-
-        if not api_key:
-            st.warning("⚠️ Enter your OpenAI API key in the sidebar to translate.")
-            return
-
-        col_btn, col_cli = st.columns([1, 2])
-        with col_btn:
-            translate_btn = st.button(
-                "🚀 Translate",
-                type="primary",
-                use_container_width=True,
-                disabled=(len(work_items) == 0),
+            work_items, id_map, total_entries = build_work_items_xliff(
+                xliff_tree, source_lang=source_lang, force=force
             )
 
-        with col_cli:
-            cli_cmd = (
-                f'python src/po_translate_en_to_nb.py "{uploaded_file.name}" "output.po"'
-                f" --model {model} --batch-size {batch_size}"
-                f" --target-lang {target_lang} --source-lang {source_lang}"
-            )
-            if force:
-                cli_cmd += " --force"
-            if context_text:
-                cli_cmd += ' --context-file "context.json"'
-            st.code(cli_cmd, language="powershell")
+            with col_info:
+                st.metric("Trans-units", total_entries)
+                st.metric("To translate", len(work_items))
+                # XLIFF items with markup need smaller batches, cap display
+                eff_batch = min(batch_size, 10)
+                estimated_calls = (len(work_items) + eff_batch - 1) // eff_batch if eff_batch else 0
+                st.metric("API calls (est.)", estimated_calls)
 
-        if translate_btn:
-            _run_translation(
-                tmp_input, model, batch_size, target_lang, source_lang,
-                force, context_text, uploaded_file.name,
+            with st.expander("📄 Preview trans-units to translate", expanded=False):
+                preview_data = []
+                for item in work_items[:100]:
+                    preview_data.append({
+                        "Has markup": "Yes" if item["has_markup"] else "No",
+                        "Source text": item["text"][:150],
+                    })
+                st.dataframe(preview_data, use_container_width=True, hide_index=True)
+                if len(work_items) > 100:
+                    st.caption(f"Showing first 100 of {len(work_items)} trans-units.")
+
+            st.divider()
+            if not api_key:
+                st.warning("⚠️ Enter your OpenAI API key in the sidebar to translate.")
+                return
+
+            col_btn, col_cli = st.columns([1, 2])
+            with col_btn:
+                translate_btn = st.button(
+                    "🚀 Translate",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=(len(work_items) == 0),
+                )
+            with col_cli:
+                cli_cmd = (
+                    f'python src/xliff_translate.py "{uploaded_file.name}" "output.xlf"'
+                    f" --model {model} --batch-size {min(batch_size, 10)}"
+                    f" --target-lang {target_lang} --source-lang {source_lang}"
+                )
+                if force:
+                    cli_cmd += " --force"
+                if context_text:
+                    cli_cmd += ' --context-file "context.json"'
+                st.code(cli_cmd, language="powershell")
+
+            if translate_btn:
+                _run_xliff_translation(
+                    tmp_input, model, batch_size, target_lang, source_lang,
+                    force, context_text, uploaded_file.name,
+                )
+
+        else:
+            # ── PO file flow (unchanged) ────────────────────────────────────
+            try:
+                po = polib.pofile(tmp_input, encoding="utf-8")
+            except Exception as e:
+                st.error(f"Failed to parse PO file: {e}")
+                return
+
+            work_items, id_map, total_entries = build_work_items(
+                po, source_lang=source_lang, force=force
             )
+
+            with col_info:
+                st.metric("Total entries", total_entries)
+                st.metric("To translate", len(work_items))
+                estimated_calls = (len(work_items) + batch_size - 1) // batch_size
+                st.metric("API calls (est.)", estimated_calls)
+
+            with st.expander("📄 Preview entries to translate", expanded=False):
+                preview_data = []
+                for item in work_items[:100]:
+                    entry_obj, src_field = id_map[item["id"]]
+                    preview_data.append({
+                        "Source lang": item["lang"],
+                        "Source field": src_field,
+                        "Text": item["text"][:120],
+                        "Current msgstr": entry_obj.msgstr[:120] if entry_obj.msgstr else "—",
+                    })
+                st.dataframe(preview_data, use_container_width=True, hide_index=True)
+                if len(work_items) > 100:
+                    st.caption(f"Showing first 100 of {len(work_items)} entries.")
+
+            st.divider()
+            if not api_key:
+                st.warning("⚠️ Enter your OpenAI API key in the sidebar to translate.")
+                return
+
+            col_btn, col_cli = st.columns([1, 2])
+            with col_btn:
+                translate_btn = st.button(
+                    "🚀 Translate",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=(len(work_items) == 0),
+                )
+            with col_cli:
+                cli_cmd = (
+                    f'python src/po_translate_en_to_nb.py "{uploaded_file.name}" "output.po"'
+                    f" --model {model} --batch-size {batch_size}"
+                    f" --target-lang {target_lang} --source-lang {source_lang}"
+                )
+                if force:
+                    cli_cmd += " --force"
+                if context_text:
+                    cli_cmd += ' --context-file "context.json"'
+                st.code(cli_cmd, language="powershell")
+
+            if translate_btn:
+                _run_translation(
+                    tmp_input, model, batch_size, target_lang, source_lang,
+                    force, context_text, uploaded_file.name,
+                )
 
     else:
-        st.info("👆 Upload a `.po` file to get started.")
+        st.info("👆 Upload a `.po` or `.xlf` file to get started.")
 
-        # Show sample usage
         with st.expander("ℹ️ How it works"):
             st.markdown("""
-1. **Upload** your `.po` file (exported from Poedit or your build system).
+**Supported formats**
+- `.po` — Poedit / gettext translation files
+- `.xlf` — XLIFF 1.2 files (e-learning, CMS, product content)
+
+**Workflow**
+1. **Upload** your translation file.
 2. **Configure** model, target language, and batch size in the sidebar.
 3. **Optionally** add domain context for better terminology.
 4. Click **Translate** and wait for the progress bar to complete.
-5. **Download** the translated `.po` file and open it in Poedit for review.
+5. **Download** the translated file.
 
-Placeholders (`%s`, `{name}`, HTML tags, URLs) are automatically validated after translation.
+Placeholders, HTML tags, and XLIFF inline codes (`<g>` elements) are preserved automatically.
             """)
 
 
@@ -362,6 +434,100 @@ def _run_translation(
             data=output_bytes,
             file_name=download_name,
             mime="application/x-gettext",
+            type="primary",
+            use_container_width=True,
+        )
+    except Exception as e:
+        st.error(f"Could not prepare download: {e}")
+
+
+def _run_xliff_translation(
+    tmp_input, model, batch_size, target_lang, source_lang,
+    force, context_text, original_filename,
+):
+    """Execute XLIFF translation and display results."""
+
+    context_file = None
+    if context_text:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w", encoding="utf-8") as ctx_tmp:
+            ctx_tmp.write(context_text)
+            context_file = ctx_tmp.name
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".xlf") as out_tmp:
+        tmp_output = out_tmp.name
+
+    progress_bar = st.progress(0, text="Starting XLIFF translation…")
+    log_container = st.empty()
+    log_messages = []
+
+    def on_progress(translated, total):
+        pct = translated / total if total > 0 else 1.0
+        progress_bar.progress(pct, text=f"Translated {translated} / {total} trans-units")
+
+    def on_log(msg):
+        log_messages.append(msg)
+        log_container.text("\n".join(log_messages[-5:]))
+
+    # XLIFF items with markup content work best at smaller batch sizes
+    effective_batch = min(batch_size, 10)
+
+    try:
+        result = translate_xliff_file(
+            tmp_input,
+            tmp_output,
+            model=model,
+            batch_size=effective_batch,
+            target_lang=target_lang,
+            source_lang=source_lang,
+            force=force,
+            context_file=context_file,
+            progress_callback=on_progress,
+            log_callback=on_log,
+        )
+    except Exception as e:
+        st.error(f"❌ XLIFF translation failed: {e}")
+        return
+
+    progress_bar.progress(1.0, text="✅ Translation complete!")
+
+    st.divider()
+    st.subheader("📊 Results")
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("✅ Translated", result["translated"])
+    col2.metric("📄 Total trans-units", result["total_entries"])
+    col3.metric("⚠️ Placeholder issues", len(result["placeholder_warnings"]))
+    col4.metric("❌ Failed", len(result["failed"]))
+
+    if result["placeholder_warnings"]:
+        with st.expander(f"⚠️ {len(result['placeholder_warnings'])} placeholder warning(s)", expanded=True):
+            pw_data = [
+                {
+                    "ID": pw["id"],
+                    "Missing": ", ".join(pw["missing"]),
+                    "Source": pw["source"][:80],
+                    "Translation": pw["translation"][:80],
+                }
+                for pw in result["placeholder_warnings"]
+            ]
+            st.dataframe(pw_data, use_container_width=True, hide_index=True)
+
+    if result["failed"]:
+        with st.expander(f"❌ {len(result['failed'])} failed item(s)"):
+            for fi in result["failed"]:
+                st.text(f"ID {fi['id']}: {fi['text'][:60]} — {fi['error']}")
+
+    # Download
+    st.divider()
+    try:
+        output_bytes = Path(tmp_output).read_bytes()
+        stem = Path(original_filename).stem
+        download_name = f"translated_{target_lang}_{stem}.xlf"
+        st.download_button(
+            label="⬇️ Download translated .xlf",
+            data=output_bytes,
+            file_name=download_name,
+            mime="application/xliff+xml",
             type="primary",
             use_container_width=True,
         )
