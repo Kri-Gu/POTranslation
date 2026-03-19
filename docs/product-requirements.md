@@ -69,6 +69,7 @@ The project solves this by offering format-aware translation with context-aware 
 
 ### Future
 - additional file formats
+- expanded language + locale coverage (e.g. `de`, `en_US`, `en_GB`, `fr_CA`)
 - hosted multi-user version
 - usage metering and billing
 - MCP/API exposure
@@ -81,6 +82,7 @@ The project solves this by offering format-aware translation with context-aware 
 - the UI must stay simple enough for non-technical users
 - modules should stay reusable outside Streamlit
 - cost transparency should be visible before large runs
+- locale variants should follow BCP 47 style codes and preserve regional spelling/terminology preferences
 
 ## Success criteria
 

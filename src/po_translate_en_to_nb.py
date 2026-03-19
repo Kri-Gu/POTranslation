@@ -115,6 +115,7 @@ _REGISTER_NOTES: Dict[str, str] = {
     "nb": "Use informal address ('du', not 'De'). Norwegian UI text conventionally uses informal second person.",
     "sv": "Use informal address ('du'). Avoid formal 'Ni' in UI text.",
     "da": "Use informal address ('du'). Formal 'De' is outdated in modern Danish UI text.",
+    "de": "Use formal address ('Sie') for professional/product UI unless the domain is explicitly casual.",
     "pl": "Use second person singular informal ('ty'-form) for modern software UI.",
     "cs": "Use informal second person singular ('ty'-form) for software UI.",
     "sk": "Use informal second person singular ('ty'-form) for software UI.",
@@ -127,6 +128,9 @@ _REGISTER_NOTES: Dict[str, str] = {
     "bg": "Use informal second person singular ('ти'-form) for software UI.",
     "ru": "Use informal second person singular ('ты'-form) for software UI, unless the product is explicitly formal.",
     "fr": "Use formal address ('vous') for professional/product UI. Use 'tu' only for casual/youth-oriented apps.",
+    "fr_CA": "Use Canadian French terminology (Quebec usage) and keep professional/formal register ('vous') for product UI.",
+    "en_US": "Use US English spelling and terminology (e.g., 'color', 'customize', 'license').",
+    "en_GB": "Use UK English spelling and terminology (e.g., 'colour', 'customise', 'licence').",
     "es": "Use informal address ('tú') for software UI. Use 'usted' only for very formal contexts.",
     "el": "Use informal second person singular ('εσύ'-form) for software UI.",
     "ka": "Use informal second person singular for software UI.",
@@ -315,6 +319,36 @@ _FEWSHOT_EXAMPLES: Dict[str, Dict] = {
             {"id": "ex3", "text": "Select %s products", "lang": "en"},
         ],
         "translations": ["Tout accepter", "Paramètres des cookies", "Sélectionner %s produits"],
+    },
+    "fr_CA": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Tout accepter", "Paramètres des témoins", "Sélectionner %s produits"],
+    },
+    "de": {
+        "items": [
+            {"id": "ex1", "text": "Accept All", "lang": "en"},
+            {"id": "ex2", "text": "Cookie Settings", "lang": "en"},
+            {"id": "ex3", "text": "Select %s products", "lang": "en"},
+        ],
+        "translations": ["Alle akzeptieren", "Cookie-Einstellungen", "%s Produkte auswählen"],
+    },
+    "en_US": {
+        "items": [
+            {"id": "ex1", "text": "Kundenstimmen - Archiv", "lang": "de"},
+            {"id": "ex2", "text": "Configure colour settings", "lang": "en"},
+        ],
+        "translations": ["Customer Reviews - Archive", "Configure color settings"],
+    },
+    "en_GB": {
+        "items": [
+            {"id": "ex1", "text": "Kundenstimmen - Archiv", "lang": "de"},
+            {"id": "ex2", "text": "Configure color settings", "lang": "en"},
+        ],
+        "translations": ["Customer Reviews - Archive", "Configure colour settings"],
     },
     "es": {
         "items": [
@@ -522,7 +556,11 @@ TARGET_LANGUAGES = {
     "sv": "Swedish",
     "da": "Danish",
     # Western European
+    "de": "German",
     "fr": "French",
+    "fr_CA": "French (Canada)",
+    "en_US": "English (US)",
+    "en_GB": "English (UK)",
     "es": "Spanish",
     # Central / South-East European
     "pl": "Polish",
@@ -554,7 +592,11 @@ _LANG_ALIASES = {
     "se": "sv", "swedish": "sv", "svenska": "sv",
     "dk": "da", "danish": "da", "dansk": "da",
     # Western European
+    "de": "de", "german": "de", "deutsch": "de",
     "french": "fr", "français": "fr",
+    "fr-ca": "fr_CA", "fr_ca": "fr_CA", "canadian french": "fr_CA", "french canada": "fr_CA",
+    "en-us": "en_US", "en_us": "en_US", "us english": "en_US", "american english": "en_US",
+    "en-gb": "en_GB", "en_gb": "en_GB", "uk english": "en_GB", "british english": "en_GB",
     "spanish": "es", "español": "es",
     # Central / South-East European
     "polish": "pl", "polski": "pl",
@@ -579,12 +621,26 @@ _LANG_ALIASES = {
 
 
 def _normalise_lang(code: str) -> str:
-    """Map common aliases and locale codes (e.g. cs_CZ, pl_PL) to canonical codes."""
-    c = code.lower().strip()
-    # Strip locale suffix: cs_cz → cs, fr_fr → fr, etc.
-    if "_" in c:
-        c = c.split("_")[0]
-    return _LANG_ALIASES.get(c, c)
+    """Map aliases/locale strings to canonical codes while preserving supported locales."""
+    if not code:
+        return code
+
+    raw = code.strip().replace("-", "_")
+    raw_lower = raw.lower()
+
+    # Direct alias mapping first (supports values like fr_ca, en_us, uk english)
+    alias_hit = _LANG_ALIASES.get(raw_lower)
+    if alias_hit:
+        return alias_hit
+
+    # Preserve exact supported locale codes (case-insensitive)
+    canonical_by_lower = {k.lower(): k for k in TARGET_LANGUAGES.keys()}
+    if raw_lower in canonical_by_lower:
+        return canonical_by_lower[raw_lower]
+
+    # Fallback to base language for unknown locale forms: cs_CZ -> cs, etc.
+    base = raw_lower.split("_")[0]
+    return _LANG_ALIASES.get(base, base)
 
 
 def get_defaults() -> Dict:

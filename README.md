@@ -9,10 +9,10 @@ Translate `.po` (gettext/Poedit) and `.xlf` (XLIFF 1.2) files using the OpenAI A
 - **High-quality translation** via `gpt-4.1` or `gpt-5.2` (configurable) with JSON mode for reliable output
 - **Glossary / term protection** — define enforced term pairs to ensure consistent terminology
 - **Cost estimator** — token and cost estimate displayed before translation starts
-- **Per-language register rules** — automatic formal/informal address handling for 19 languages
+- **Per-language register rules** — automatic formal/informal or locale-style guidance for 23 languages/locales
 - **Domain context support** — feed a context file so the model understands your product domain
 - **Per-entry source detection** (English vs German) with a `--source-lang` override
-- **Target languages**: `nb` (Norwegian Bokmål), `sv` (Swedish), `da` (Danish), `fr`, `es`, `pl`, `cs`, `sk`, `hu`, `hr`, `bs`, `sr`, `sl`, `ro`, `bg`, `ru`, `ka`, `el`, `me`
+- **Target languages**: `nb` (Norwegian Bokmål), `sv` (Swedish), `da` (Danish), `de` (German), `fr`, `fr_CA`, `en_US`, `en_GB`, `es`, `pl`, `cs`, `sk`, `hu`, `hr`, `bs`, `sr`, `sl`, `ro`, `bg`, `ru`, `ka`, `el`, `me`
 - **Placeholder preservation** with post-translation validation (`%s`, `%d`, `{name}`, HTML tags, URLs)
 - **XLIFF inline markup preservation** — `<g>` elements and their attributes survive translation unchanged
 - **Batch processing** with retry and per-item fallback on failure
@@ -61,7 +61,7 @@ The `.env` file configures defaults for both the CLI and the web UI:
 OPENAI_API_KEY=sk-proj-YOUR-KEY-HERE
 
 # All of these are optional — they set the default values
-DEFAULT_TARGET_LANGUAGE=nb    # nb, sv, da (also accepts: no, dk, se)
+DEFAULT_TARGET_LANGUAGE=nb    # e.g. nb, sv, da, de, fr_CA, en_US, en_GB
 DEFAULT_SOURCE_LANGUAGE=auto  # auto, en, de
 DEFAULT_MODEL=gpt-4.1        # any model from the table below
 BATCH_SIZE=20                 # 5–50

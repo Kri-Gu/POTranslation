@@ -28,18 +28,19 @@ Planned features in implementation order, building from simplest to most complex
 |---|---------|--------|-------|
 | 11 | **Translation memory** (SQLite cache) | 🔲 Pending | Cache translated segments locally; identical source = free result |
 | 12 | **Back-translation confidence check** | 🔲 Pending | Back-translate a random sample and flag divergent entries |
+| 13 | **Language and locale expansion** | 🔲 Pending | Add critical locales and region variants (e.g. `de`, `en_US`, `en_GB`, `fr_CA`) with locale-aware prompt/register rules |
 
 ## File format support
 
 | # | Feature | Status | Notes |
 |---|---------|--------|-------|
-| 13 | **IDML** (Adobe InDesign) | 🔲 Pending | Unzip, translate `Stories/*.xml` `<Content>` nodes, repack. See `docs/format-support.md` |
-| 14 | **HTML / HTM** | 🔲 Pending | Translate text nodes, preserve tags and attributes |
-| 15 | **Markdown** | 🔲 Pending | Translate body text, preserve headings, code blocks, links, front matter |
-| 16 | **DITA** (.dita / .ditamap) | 🔲 Pending | XML-based technical writing format; translate `<title>`, `<p>`, `<li>`, `<td>` etc. |
-| 17 | **Android strings.xml** | 🔲 Pending | `<resources>/<string>` and `<string-array>` elements |
-| 18 | **iOS / macOS .strings** | 🔲 Pending | Key = "Source text"; translate values |
-| 19 | **JSON i18n** (i18next / Angular / React) | 🔲 Pending | Flat and nested key→value; preserve numeric keys and ICU plurals |
+| 14 | **IDML** (Adobe InDesign) | 🔲 Pending | Unzip, translate `Stories/*.xml` `<Content>` nodes, repack. See `docs/format-support.md` |
+| 15 | **HTML / HTM** | 🔲 Pending | Translate text nodes, preserve tags and attributes |
+| 16 | **Markdown** | 🔲 Pending | Translate body text, preserve headings, code blocks, links, front matter |
+| 17 | **DITA** (.dita / .ditamap) | 🔲 Pending | XML-based technical writing format; translate `<title>`, `<p>`, `<li>`, `<td>` etc. |
+| 18 | **Android strings.xml** | 🔲 Pending | `<resources>/<string>` and `<string-array>` elements |
+| 19 | **iOS / macOS .strings** | 🔲 Pending | Key = "Source text"; translate values |
+| 20 | **JSON i18n** (i18next / Angular / React) | 🔲 Pending | Flat and nested key→value; preserve numeric keys and ICU plurals |
 
 ---
 
@@ -52,7 +53,8 @@ Planned features in implementation order, building from simplest to most complex
 - **7–10:** Bigger UI/workflow changes; diff view builds on multi-lang output; ZIP wraps existing logic
 - **11:** Infrastructure change that underpins cost savings — best added when the flow is stable
 - **12:** Most API-intensive feature; last in the core flow
-- **13–19:** New format modules are independent of each other; IDML first as it's the most requested
+- **13:** Expand language and locale coverage before broadening format count, since locale quality directly affects adoption
+- **14–20:** New format modules are independent of each other; IDML first as it's the most requested
 
 ## Future architecture considerations
 

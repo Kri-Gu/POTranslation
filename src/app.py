@@ -8,9 +8,13 @@ Run with:
 import os
 import sys
 import tempfile
+import csv
+import io
 from pathlib import Path
+from typing import Dict, List
 
 import streamlit as st
+from openpyxl import load_workbook
 
 # Ensure the src package is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -65,6 +69,100 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+
+def _dedupe_glossary(entries: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Keep first occurrence per source term and drop invalid rows."""
+    deduped: List[Dict[str, str]] = []
+    seen = set()
+    for item in entries:
+        src = str(item.get("source", "")).strip()
+        tgt = str(item.get("target", "")).strip()
+        if not src or not tgt:
+            continue
+        key = src.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append({"source": src, "target": tgt})
+    return deduped
+
+
+def _parse_glossary_text(text: str) -> List[Dict[str, str]]:
+    """Parse glossary lines entered as 'source -> target' style rows."""
+    parsed: List[Dict[str, str]] = []
+    if not text.strip():
+        return parsed
+
+    for line in text.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        for sep in ["→", "=", "->"]:
+            if sep in line:
+                src, tgt = line.split(sep, 1)
+                parsed.append({"source": src.strip(), "target": tgt.strip()})
+                break
+    return _dedupe_glossary(parsed)
+
+
+def _parse_glossary_upload(uploaded_file) -> List[Dict[str, str]]:
+    """Parse glossary rows from .csv or .xlsx files."""
+    if uploaded_file is None:
+        return []
+
+    name = uploaded_file.name.lower()
+    parsed: List[Dict[str, str]] = []
+
+    if name.endswith(".csv"):
+        raw = uploaded_file.getvalue().decode("utf-8-sig", errors="replace")
+        stream = io.StringIO(raw)
+        reader = csv.DictReader(stream)
+        field_map = {str(k).strip().lower(): k for k in (reader.fieldnames or [])}
+
+        if "source" in field_map and "target" in field_map:
+            for row in reader:
+                parsed.append(
+                    {
+                        "source": str(row.get(field_map["source"], "")).strip(),
+                        "target": str(row.get(field_map["target"], "")).strip(),
+                    }
+                )
+        else:
+            stream.seek(0)
+            plain_reader = csv.reader(stream)
+            for row in plain_reader:
+                if len(row) < 2:
+                    continue
+                parsed.append({"source": str(row[0]).strip(), "target": str(row[1]).strip()})
+
+    elif name.endswith(".xlsx"):
+        wb = load_workbook(io.BytesIO(uploaded_file.getvalue()), read_only=True, data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            return []
+
+        first_row = [str(c).strip().lower() if c is not None else "" for c in rows[0]]
+        has_headers = "source" in first_row and "target" in first_row
+
+        if has_headers:
+            src_idx = first_row.index("source")
+            tgt_idx = first_row.index("target")
+            data_rows = rows[1:]
+        else:
+            src_idx = 0
+            tgt_idx = 1
+            data_rows = rows
+
+        for row in data_rows:
+            if row is None:
+                continue
+            src = str(row[src_idx]).strip() if len(row) > src_idx and row[src_idx] is not None else ""
+            tgt = str(row[tgt_idx]).strip() if len(row) > tgt_idx and row[tgt_idx] is not None else ""
+            parsed.append({"source": src, "target": tgt})
+
+    return _dedupe_glossary(parsed)
 
 
 def main():
@@ -174,26 +272,24 @@ def main():
             help="Enter one term pair per line, separated by → or =. These terms will be enforced during translation.",
         )
 
-        # Parse glossary from text input
-        glossary: list = []
-        if glossary_input.strip():
-            for line in glossary_input.strip().splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                # Support → and = as separators
-                for sep in ["→", "=", "->"]:
-                    if sep in line:
-                        parts = line.split(sep, 1)
-                        src = parts[0].strip()
-                        tgt = parts[1].strip()
-                        if src and tgt:
-                            glossary.append({"source": src, "target": tgt})
-                        break
-            st.session_state.glossary = glossary
+        glossary_file = st.file_uploader(
+            "Upload glossary file (.csv or .xlsx)",
+            type=["csv", "xlsx"],
+            key="glossary_upload",
+            help="CSV/XLSX with columns `source` and `target` (or first two columns as source/target).",
+        )
+
+        # Parse glossary from text input and optional file upload
+        glossary_text_entries = _parse_glossary_text(glossary_input)
+        glossary_file_entries = _parse_glossary_upload(glossary_file) if glossary_file else []
+        glossary: list = _dedupe_glossary(glossary_text_entries + glossary_file_entries)
+
+        st.session_state.glossary = glossary
 
         if glossary:
             st.success(f"{len(glossary)} glossary term(s) loaded")
+            if glossary_file_entries:
+                st.caption(f"{len(glossary_file_entries)} loaded from file upload")
 
         st.divider()
         st.caption("CLI equivalent shown after translation.")
