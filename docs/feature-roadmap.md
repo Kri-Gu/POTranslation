@@ -8,15 +8,15 @@ Planned features in implementation order, building from simplest to most complex
 |---|---------|--------|-------|
 | 1 | **XLIFF translation state** (`state="translated"`) | ✅ Done | Sets standard XLIFF attribute on each `<target>` element |
 | 2 | **XLIFF target-language attribute** | ✅ Done | Sets `target-language` on `<file>` elements to match chosen target lang |
-| 3 | **Glossary / term protection** | 🔲 Pending | Sidebar input for terms that must never be translated (product names, brand terms) |
-| 4 | **Prompt optimisation** | 🔲 Pending | Improve system/user prompts; per-format register; JSON schema enforcement; glossary injection. See `docs/prompt-guide.md` |
+| 3 | **Glossary / term protection** | ✅ Done | Sidebar input for enforced term pairs; injected into both PO and XLIFF prompts |
+| 4 | **Prompt optimisation** | ✅ Done | Per-language register rules (19 langs), richer role framing, XLIFF `<g>` tag preservation examples |
 
 ## Workflow & UI
 
 | #   | Feature                           | Status     | Notes                                                                 |
 | --- | --------------------------------- | ---------- | --------------------------------------------------------------------- |
 | 5   | **`.env` editor in sidebar**      | 🔲 Pending | Small UI panel to set API key and defaults without editing files      |
-| 6   | **Cost estimator**                | 🔲 Pending | Pre-flight token count + approximate API cost before translating      |
+| 6   | **Cost estimator**                | ✅ Done   | Token estimate + USD cost preview per model displayed before translation     |
 | 7   | **Multi-target batch language**   | 🔲 Pending | Translate one file into N languages in one click                      |
 | 8   | **Side-by-side diff view**        | 🔲 Pending | 3-column table: source / old translation / new translation for review |
 | 9   | **Segment review UI**             | 🔲 Pending | Editable table post-translation; correct entries before downloading   |

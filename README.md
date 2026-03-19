@@ -7,9 +7,12 @@ Translate `.po` (gettext/Poedit) and `.xlf` (XLIFF 1.2) files using the OpenAI A
 - **Web UI (Streamlit)** — upload, configure, translate, and download without touching the command line
 - **Multi-format support** — `.po` (gettext/Poedit) and `.xlf` (XLIFF 1.2) with correct round-trip handling
 - **High-quality translation** via `gpt-4.1` or `gpt-5.2` (configurable) with JSON mode for reliable output
+- **Glossary / term protection** — define enforced term pairs to ensure consistent terminology
+- **Cost estimator** — token and cost estimate displayed before translation starts
+- **Per-language register rules** — automatic formal/informal address handling for 19 languages
 - **Domain context support** — feed a context file so the model understands your product domain
 - **Per-entry source detection** (English vs German) with a `--source-lang` override
-- **Target languages**: `nb` (Norwegian Bokmål), `sv` (Swedish), `da` (Danish), `pl`, `cs`, `sk`, `hu`, `hr`, `sl`, `ro`, `bg`, `sr`
+- **Target languages**: `nb` (Norwegian Bokmål), `sv` (Swedish), `da` (Danish), `fr`, `es`, `pl`, `cs`, `sk`, `hu`, `hr`, `bs`, `sr`, `sl`, `ro`, `bg`, `ru`, `ka`, `el`, `me`
 - **Placeholder preservation** with post-translation validation (`%s`, `%d`, `{name}`, HTML tags, URLs)
 - **XLIFF inline markup preservation** — `<g>` elements and their attributes survive translation unchanged
 - **Batch processing** with retry and per-item fallback on failure
@@ -76,8 +79,9 @@ streamlit run src/app.py
 ```
 
 This opens a browser with:
-- File upload for your `.po` file
-- Sidebar to choose model, target language, batch size, and domain context
+- File upload for your `.po` or `.xlf` file
+- Sidebar to choose model, target language, batch size, domain context, and glossary terms
+- Pre-flight cost estimate (tokens and USD) before translation
 - Live progress bar during translation
 - Translation preview table
 - Download button for the result

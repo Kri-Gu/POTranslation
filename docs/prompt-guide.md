@@ -39,24 +39,24 @@ Similar structure but handles markup items differently: when a `<source>` contai
 
 ## Identified weaknesses
 
-| # | Weakness | Impact |
-|---|---------|--------|
-| W1 | Role is generic ("expert translator") — no cues about native level or specialisation depth | Medium |
-| W2 | Register (formal/informal "you") not specified per language — Norwegian defaults vary by domain | High |
-| W3 | Glossary terms not injected into the prompt — model invents its own terms | High |
-| W4 | Few-shot examples are static and not domain-specific | Medium |
-| W5 | `json_object` response format allows any key names — model can still hallucinate structure | Low-Medium |
-| W6 | No explicit instruction to preserve UI-string length/brevity constraints | Low |
-| W7 | `temperature=0.2` is reasonable but not validated against alternatives | Low |
-| W8 | Markup prompt for XLIFF doesn't tell the model which `<g>` attributes to copy | Medium |
-| W9 | No chain-of-thought for complex, ambiguous segments | Medium |
-| W10 | Source language tagged per-item but no confidence signal when detection is uncertain | Low |
+| # | Weakness | Impact | Status |
+|---|---------|--------|--------|
+| W1 | Role is generic ("expert translator") — no cues about native level or specialisation depth | Medium | ✅ Fixed |
+| W2 | Register (formal/informal "you") not specified per language — Norwegian defaults vary by domain | High | ✅ Fixed |
+| W3 | Glossary terms not injected into the prompt — model invents its own terms | High | ✅ Fixed |
+| W4 | Few-shot examples are static and not domain-specific | Medium | Pending |
+| W5 | `json_object` response format allows any key names — model can still hallucinate structure | Low-Medium | Pending |
+| W6 | No explicit instruction to preserve UI-string length/brevity constraints | Low | Pending |
+| W7 | `temperature=0.2` is reasonable but not validated against alternatives | Low | Pending |
+| W8 | Markup prompt for XLIFF doesn't tell the model which `<g>` attributes to copy | Medium | ✅ Fixed |
+| W9 | No chain-of-thought for complex, ambiguous segments | Medium | Pending |
+| W10 | Source language tagged per-item but no confidence signal when detection is uncertain | Low | Pending |
 
 ---
 
 ## Recommended improvements
 
-### Improvement 1 — Stronger role framing (addresses W1)
+### Improvement 1 — Stronger role framing ✅ IMPLEMENTED (addresses W1)
 
 **Current:**
 ```
@@ -75,7 +75,10 @@ so precision and consistency are critical.
 
 ---
 
-### Improvement 2 — Explicit register instruction per language (addresses W2)
+### Improvement 2 — Explicit register instruction per language ✅ IMPLEMENTED (addresses W2)
+
+Implemented as `_REGISTER_NOTES` dict in `po_translate_en_to_nb.py` with 19 language entries.
+Register rules are injected automatically after rule 5 in the system prompt for both PO and XLIFF.
 
 Add a per-language register note to the system prompt:
 
@@ -97,7 +100,11 @@ Inject this after rule 5:
 
 ---
 
-### Improvement 3 — Glossary injection (addresses W3)
+### Improvement 3 — Glossary injection ✅ IMPLEMENTED (addresses W3)
+
+Implemented via `format_glossary_for_prompt()` in `po_translate_en_to_nb.py`.
+Glossary is injected before domain context in the system prompt.
+UI provides text area input with `→`, `=`, `->` separator support.
 
 When the user provides a glossary (feature roadmap #3), inject it as a dedicated section:
 
@@ -175,7 +182,10 @@ The `load_context()` function would then return both the instructions text and t
 
 ---
 
-### Improvement 6 — XLIFF markup prompt hardening (addresses W8)
+### Improvement 6 — XLIFF markup prompt hardening ✅ IMPLEMENTED (addresses W8)
+
+Implemented in `_make_xliff_system_prompt()` in `xliff_translate.py`.
+Includes correct/wrong examples for `<g>` tag handling.
 
 Current XLIFF prompt tells the model to "preserve the tag structure exactly". Strengthen this with an explicit example showing `<g>` attribute preservation:
 

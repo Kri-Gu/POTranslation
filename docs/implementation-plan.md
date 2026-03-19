@@ -4,36 +4,50 @@
 
 Take the current local Streamlit tool from a working translator for `.po` and `.xlf` files to a robust product foundation suitable for internal use, commercial pilots, and later hosted deployment.
 
-## Phase 1 — Translation quality and control
+## Phase 1 — Translation quality and control ✅ COMPLETE
 
-### 1. Glossary / term protection
-Reason:
-This is the highest-leverage improvement because terminology consistency matters more than minor prompt tweaks.
-
-Deliverables:
-- glossary input in UI
-- glossary injection into prompts
-- exact-match term protection rules
-- glossary saved with session state
-
-### 2. Prompt optimisation
-Reason:
-Prompt hardening improves all formats at once.
+### 1. Glossary / term protection ✅
+Status: **Implemented**
 
 Deliverables:
-- explicit register rules by language
-- richer translator role framing
-- stricter markup preservation guidance for XLIFF
-- optional structured schema output if model support is confirmed
+- ✅ glossary input in UI (sidebar text area, `source → target` format)
+- ✅ glossary injection into prompts (both PO and XLIFF engines)
+- ✅ exact-match term protection rules (enforced via system prompt)
+- ✅ glossary saved with session state (`st.session_state.glossary`)
 
-### 3. Cost estimator
-Reason:
-Large-file usage needs cost visibility before execution.
+Implementation notes:
+- `format_glossary_for_prompt()` in `po_translate_en_to_nb.py` — shared by both engines
+- Glossary section inserted before domain context in system prompt
+- UI supports `→`, `=`, and `->` as separators
+- Shows count of loaded terms in sidebar
+
+### 2. Prompt optimisation ✅
+Status: **Implemented**
 
 Deliverables:
-- token estimate based on source length
-- estimated request count by batch size
-- rough cost preview per model
+- ✅ explicit register rules by language (`_REGISTER_NOTES` dict — 19 languages)
+- ✅ richer translator role framing ("professional technical translator, native in…")
+- ✅ stricter markup preservation guidance for XLIFF (correct/wrong `<g>` tag examples)
+- ⏳ optional structured schema output — deferred, JSON mode already used
+
+Implementation notes:
+- `_REGISTER_NOTES` covers: nb_NO, nn_NO, da_DK, sv_SE, fi_FI, de_DE, fr_FR, es_ES, pt_BR, it_IT, nl_NL, pl_PL, cs_CZ, sk_SK, hu_HU, ro_RO, bg_BG, hr_HR, sr_RS
+- Register rules injected after base translation rules in system prompt
+- XLIFF prompt includes explicit before/after examples for `<g>` tag preservation
+
+### 3. Cost estimator ✅
+Status: **Implemented**
+
+Deliverables:
+- ✅ token estimate based on source length (`_CHARS_PER_TOKEN = 3.5`)
+- ✅ estimated request count by batch size
+- ✅ rough cost preview per model (6 models in pricing table)
+
+Implementation notes:
+- Module: `src/cost_estimator.py`
+- Pricing table: gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-5.2, gpt-4o, gpt-4o-mini
+- Displayed as metrics in the file info column ("Est. tokens", "Est. cost")
+- Constants: `_PROMPT_OVERHEAD_TOKENS = 600`, `_OUTPUT_MULTIPLIER = 1.4`
 
 ## Phase 2 — Review workflow
 

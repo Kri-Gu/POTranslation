@@ -7,13 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Glossary / term protection** — sidebar UI for enforced term pairs (`source → target`), injected into system prompts for both PO and XLIFF engines
+- **Prompt optimisation** — richer translator role framing, per-language register rules (19 languages), XLIFF `<g>` tag preservation examples with correct/wrong demonstrations
+- **Cost estimator** — pre-flight token and cost estimation displayed before translation, with pricing for 6 OpenAI models
+- **New module `src/cost_estimator.py`** — standalone cost estimation with model pricing table
+
+### Changed
+- `make_system_prompt()` now accepts optional `glossary` parameter and injects register rules
+- `_make_xliff_system_prompt()` rewritten with glossary, register, and markup hardening support
+- `translate_po_file()` and `translate_xliff_file()` accept `glossary` parameter
+- Sidebar UI expanded: glossary input section, cost metrics in file info column
+
 ### Planned
-- Support for additional target languages
-- GUI interface using tkinter
-- Batch processing of multiple PO files
-- Configuration file support
+- Side-by-side diff view
+- Segment review UI
 - Translation memory integration
-- Progress bar for large files
+- IDML format support
+- Batch/ZIP processing
 
 ## [1.0.0] - 2024-10-24
 

@@ -54,9 +54,11 @@ If port `8501` is already in use, Streamlit will select the next available port.
 
 1. Upload a `.po` or `.xlf` file.
 2. Select target language, model, and batch size.
-3. Optionally provide a context file.
-4. Add your API key in the sidebar if it is not in `.env`.
-5. Click the translate button and download the output file.
+3. Optionally provide domain context (upload file or paste text).
+4. Optionally add glossary terms in the sidebar (one per line: `source → target`).
+5. Add your API key in the sidebar if it is not in `.env`.
+6. Review the estimated token count and cost before translating.
+7. Click the translate button and download the output file.
 
 ## CLI usage
 

@@ -110,16 +110,65 @@ try:
 except Exception as e:
     raise SystemExit("OpenAI SDK not installed or import failed. Run: pip install openai") from e
 
-def make_system_prompt(target_lang: str = "nb", domain_context: str = "") -> str:
+# ── Per-language register rules ───────────────────────────────────────────────
+_REGISTER_NOTES: Dict[str, str] = {
+    "nb": "Use informal address ('du', not 'De'). Norwegian UI text conventionally uses informal second person.",
+    "sv": "Use informal address ('du'). Avoid formal 'Ni' in UI text.",
+    "da": "Use informal address ('du'). Formal 'De' is outdated in modern Danish UI text.",
+    "pl": "Use second person singular informal ('ty'-form) for modern software UI.",
+    "cs": "Use informal second person singular ('ty'-form) for software UI.",
+    "sk": "Use informal second person singular ('ty'-form) for software UI.",
+    "hu": "Use informal address ('te'-form) for software UI.",
+    "hr": "Use informal second person singular ('ti'-form) for software UI.",
+    "sr": "Use informal second person singular ('ti'-form) for software UI.",
+    "bs": "Use informal second person singular ('ti'-form) for software UI.",
+    "sl": "Use informal second person singular ('ti'-form) for software UI.",
+    "ro": "Use informal second person singular ('tu'-form) for software UI.",
+    "bg": "Use informal second person singular ('ти'-form) for software UI.",
+    "ru": "Use informal second person singular ('ты'-form) for software UI, unless the product is explicitly formal.",
+    "fr": "Use formal address ('vous') for professional/product UI. Use 'tu' only for casual/youth-oriented apps.",
+    "es": "Use informal address ('tú') for software UI. Use 'usted' only for very formal contexts.",
+    "el": "Use informal second person singular ('εσύ'-form) for software UI.",
+    "ka": "Use informal second person singular for software UI.",
+    "me": "Use informal second person singular ('ti'-form) for software UI.",
+}
+
+
+def format_glossary_for_prompt(glossary: List[Dict[str, str]]) -> str:
+    """Format glossary entries for injection into the system prompt.
+
+    Each entry should have 'source' and 'target' keys.
+    Returns an empty string if the glossary is empty.
+    """
+    if not glossary:
+        return ""
+    lines = [
+        "\n=== GLOSSARY (mandatory) ===",
+        "The following terms MUST be translated exactly as shown. Do not paraphrase or transliterate.",
+    ]
+    for entry in glossary:
+        src = entry.get("source", "").strip()
+        tgt = entry.get("target", "").strip()
+        if src and tgt:
+            lines.append(f'  "{src}" → "{tgt}"')
+    lines.append("Terms not in this list should follow normal translation rules.")
+    return "\n".join(lines)
+
+
+def make_system_prompt(target_lang: str = "nb", domain_context: str = "", glossary: Optional[List[Dict[str, str]]] = None) -> str:
     """
     Build a rich system prompt that tells the model exactly how to behave.
     """
     lang_map = {code: name for code, name in TARGET_LANGUAGES.items()}
     target_name = lang_map.get(target_lang, target_lang)
 
+    register_note = _REGISTER_NOTES.get(target_lang, "")
+
     parts = [
-        f"You are an expert translator specialising in {target_name} ({target_lang}).",
-        "You translate UI strings and technical content from English or German into the target language.",
+        f"You are a professional technical translator, native in {target_name}, with deep experience "
+        f"localising software UI, user manuals, and e-commerce content.",
+        "Your translations are used directly in production software without human review, "
+        "so precision and consistency are critical.",
         "The source language for each item is indicated by its `lang` field.",
         "",
         "=== RULES (strictly enforce) ===",
@@ -128,10 +177,20 @@ def make_system_prompt(target_lang: str = "nb", domain_context: str = "") -> str
         "3) Match the source string's capitalization style (title case → title case, sentence case → sentence case) unless target-language grammar requires otherwise.",
         "4) Preserve the same punctuation and whitespace pattern (trailing periods, colons, spaces).",
         f"5) Use natural, idiomatic {target_name}. Prefer standard terminology over literal word-for-word translation.",
+    ]
+
+    if register_note:
+        parts.append(f"5b) Register: {register_note}")
+
+    parts.extend([
         "6) For technical/product terms with no established translation, keep the original term.",
         "7) Return ONLY a valid JSON object: {\"translations\": [{\"id\": \"…\", \"translation\": \"…\"}, …]}",
         "8) Do NOT add extra keys, markdown formatting, or commentary.",
-    ]
+    ])
+
+    # Glossary injection — placed before domain context for higher priority
+    if glossary:
+        parts.append(format_glossary_for_prompt(glossary))
 
     if domain_context:
         parts.append("")
@@ -342,12 +401,13 @@ def call_model(
     model: str,
     target_lang: str = "nb",
     domain_context: str = "",
+    glossary: Optional[List[Dict[str, str]]] = None,
 ) -> Dict[str, str]:
     """
     Send a batch to the model and get back a dict id -> translation.
     Uses JSON mode for reliable structured output. Retries on transient errors.
     """
-    system_prompt = make_system_prompt(target_lang=target_lang, domain_context=domain_context)
+    system_prompt = make_system_prompt(target_lang=target_lang, domain_context=domain_context, glossary=glossary)
     user_prompt = make_user_prompt(batch, target_lang=target_lang)
 
     # Build request payload — use JSON mode for guaranteed valid JSON
@@ -631,6 +691,7 @@ def translate_po_file(
     source_lang: str = "auto",
     force: bool = False,
     context_file: Optional[str] = None,
+    glossary: Optional[List[Dict[str, str]]] = None,
     progress_callback=None,
     log_callback=None,
 ) -> Dict:
@@ -673,7 +734,7 @@ def translate_po_file(
 
     for batch in chunked(work_items, batch_size):
         try:
-            translations = call_model(batch, model, target_lang=target_lang, domain_context=domain_context)
+            translations = call_model(batch, model, target_lang=target_lang, domain_context=domain_context, glossary=glossary)
             for tid, trans in translations.items():
                 if trans is None:
                     continue
@@ -691,7 +752,7 @@ def translate_po_file(
             _log(f"Batch failed ({e}), retrying individually…")
             for item in batch:
                 try:
-                    single_trans = call_model([item], model, target_lang=target_lang, domain_context=domain_context)
+                    single_trans = call_model([item], model, target_lang=target_lang, domain_context=domain_context, glossary=glossary)
                     for tid, trans in single_trans.items():
                         if trans is None:
                             continue

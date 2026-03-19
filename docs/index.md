@@ -32,8 +32,8 @@ This note is the entry point for the project in Obsidian.
 
 - Translation engine supports `.po` and `.xlf` (XLIFF 1.2)
 - Streamlit frontend is working locally
-- Prompting, glossary, translation memory, and additional formats are the next meaningful product upgrades
-- IDML is the strongest next new-format candidate
+- **Phase 1 complete:** Glossary/term protection, prompt optimisation, and cost estimator are implemented
+- Next priorities: side-by-side diff view, translation memory, IDML format support
 
 ## Recommended reading order
 

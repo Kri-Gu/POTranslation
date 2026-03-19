@@ -180,3 +180,7 @@ Thumbs.db
 
 # Temporary test scripts
 test_models.py
+test_setup.py
+
+# Build artefacts
+output.zip

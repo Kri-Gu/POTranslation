@@ -57,6 +57,8 @@ from src.po_translate_en_to_nb import (
     _normalise_lang,
     chunked,
     client,          # already-initialised OpenAI client
+    format_glossary_for_prompt,
+    _REGISTER_NOTES,
 )
 
 # ── XML helpers ───────────────────────────────────────────────────────────────
@@ -217,12 +219,18 @@ def build_work_items_xliff(
 
 # ── System & user prompts ─────────────────────────────────────────────────────
 
-def _make_xliff_system_prompt(target_lang: str, domain_context: str = "") -> str:
+def _make_xliff_system_prompt(target_lang: str, domain_context: str = "", glossary: Optional[List[Dict[str, str]]] = None) -> str:
     target_name = TARGET_LANGUAGES.get(target_lang, target_lang)
 
+    # Look up register note using short code (strip _XX suffix if present)
+    lang_short = target_lang.split("_")[0] if "_" in target_lang else target_lang
+    register_note = _REGISTER_NOTES.get(lang_short, "")
+
     parts = [
-        f"You are an expert translator specialising in {target_name} ({target_lang}).",
-        "You translate professional product and e-learning content from English into the target language.",
+        f"You are a professional technical translator, native in {target_name}, with deep experience "
+        f"localising software UI, user manuals, and e-commerce content.",
+        "Your translations are used directly in production software without human review, "
+        "so precision and consistency are critical.",
         "",
         "=== RULES ===",
         f"1) Translate into {target_name} ONLY.",
@@ -236,10 +244,39 @@ def _make_xliff_system_prompt(target_lang: str, domain_context: str = "") -> str
         ),
         "4) Preserve placeholders (%s, %d, {name}, HTML entities like &amp;) exactly.",
         "5) Match the source capitalization style (ALL CAPS → ALL CAPS, Title Case → Title Case).",
+    ]
+
+    if register_note:
+        parts.append(f"5b) Register: {register_note}")
+
+    parts += [
         "6) Keep technical terms and product names (e.g. 'Hydro-Gear ZT-3100', 'AS 990 Tahr RC') as-is.",
         "7) Return ONLY a valid JSON object: {\"translations\": [{\"id\": \"…\", \"translation\": \"…\"}, …]}",
         "8) Do NOT add markdown, code fences, or commentary outside the JSON.",
+        "",
+        "=== XLIFF INLINE MARKUP RULES ===",
+        "Source segments may contain <g> tags representing inline formatting.",
+        "You MUST:",
+        "- Keep every <g> tag and its id attribute exactly: <g id=\"1\">…</g>",
+        "- Only translate the TEXT CONTENT between and around the tags",
+        "- Never add, remove, rename, or re-order <g> tags",
+        "- Never change id=\"…\" values",
+        "",
+        "Example:",
+        "  Source:  Add <g id=\"1\">all</g> items to cart",
+        "  Correct: Legg til <g id=\"1\">alle</g> varer i handlekurven",
+        "  Wrong:   Legg til <g id=\"2\">alle</g> varer i handlekurven   ← id changed",
+        "  Wrong:   Legg <g id=\"1\">til alle varer</g> i handlekurven  ← tag scope changed",
     ]
+
+    # Glossary section
+    if glossary:
+        glossary_text = format_glossary_for_prompt(glossary)
+        parts += [
+            "",
+            "=== GLOSSARY (mandatory) ===",
+            glossary_text,
+        ]
 
     if domain_context:
         parts += [
@@ -286,9 +323,10 @@ def _call_model_xliff(
     model: str,
     target_lang: str = "nb",
     domain_context: str = "",
+    glossary: Optional[List[Dict[str, str]]] = None,
 ) -> Dict[str, str]:
     """Send a batch of XLIFF items to the model; return {id: translated_content}."""
-    system_prompt = _make_xliff_system_prompt(target_lang, domain_context)
+    system_prompt = _make_xliff_system_prompt(target_lang, domain_context, glossary=glossary)
     user_prompt   = _make_xliff_user_prompt(batch, target_lang)
 
     messages: Any = [
@@ -371,6 +409,7 @@ def translate_xliff_file(
     source_lang: str = "auto",
     force: bool = False,
     context_file: Optional[str] = None,
+    glossary: Optional[List[Dict[str, str]]] = None,
     progress_callback=None,
     log_callback=None,
 ) -> Dict:
@@ -423,7 +462,7 @@ def translate_xliff_file(
     for batch in chunked(work_items, batch_size):
         try:
             translations = _call_model_xliff(
-                batch, model, target_lang=target_lang, domain_context=domain_context
+                batch, model, target_lang=target_lang, domain_context=domain_context, glossary=glossary
             )
 
             for item in batch:
@@ -455,7 +494,7 @@ def translate_xliff_file(
             for item in batch:
                 try:
                     single = _call_model_xliff(
-                        [item], model, target_lang=target_lang, domain_context=domain_context
+                        [item], model, target_lang=target_lang, domain_context=domain_context, glossary=glossary
                     )
                     trans = single.get(item["id"])
                     if trans is None:

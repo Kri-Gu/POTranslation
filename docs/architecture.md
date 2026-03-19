@@ -21,11 +21,21 @@ This tool translates localisation files (`.po`, `.xlf`) via the OpenAI API. It h
    - make_user_prompt()             - _make_user_prompt_xliff()
    - _call_model_po()               - _call_model_xliff()
    - translate_po_file()            - translate_xliff_file()
+   - format_glossary_for_prompt()   - imports glossary+register
+   - _REGISTER_NOTES                  from po module
                │                          │
                └──────────┬───────────────┘
                            ▼
               OpenAI Chat Completions API
               JSON mode / structured output
+                           ▲
+               ┌───────────┘
+               │
+   src/cost_estimator.py
+   ──────────────────────
+   - estimate_cost()
+   - estimate_tokens()
+   - model pricing table
 ```
 
 ## Module responsibilities
@@ -46,6 +56,8 @@ The original translation engine and the **shared library** that XLIFF re-uses.
 | `extract_placeholders(s)` | Find `%s`, `{name}`, `<tag>`, URLs etc. |
 | `validate_placeholders(src, tgt)` | Return placeholders dropped in translation |
 | `make_system_prompt(lang, ctx)` | Build the system prompt sent to the model |
+| `format_glossary_for_prompt(glossary)` | Format glossary entries for prompt injection |
+| `_REGISTER_NOTES` | Per-language register/formality rules (19 languages) |
 | `make_user_prompt(items, lang, ex)` | Build the batched user prompt |
 | `chunked(iterable, n)` | Split list into batches of `n` |
 | `build_work_items(po, force)` | Extract entries needing translation from a `.po` |
@@ -79,11 +91,22 @@ Internal helpers (not exported):
 Streamlit UI. Contains no translation logic. Responsibilities:
 
 1. File upload widget (accepts `.po`, `.xlf`)
-2. Sidebar settings (model, language, batch size, API key, context file)
-3. Pre-flight: detect format, call `build_work_items_*`, show count
+2. Sidebar settings (model, language, batch size, API key, context file, glossary)
+3. Pre-flight: detect format, call `build_work_items_*`, show count + cost estimate
 4. Run translation with live progress bar via `progress_callback`
 5. Show results table and warnings
 6. Offer in-memory download without writing to disk (uses `tempfile`)
+
+### `src/cost_estimator.py`
+
+Pre-flight cost estimation module. No API calls, no Streamlit dependency.
+
+| Export | Purpose |
+|--------|---------|
+| `estimate_cost(work_items, model, batch_size)` | Returns dict with token/cost estimates |
+| `estimate_tokens(text)` | Estimate token count from character length |
+
+Pricing table covers: gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-5.2, gpt-4o, gpt-4o-mini.
 
 ## Data flow — translation request lifecycle
 

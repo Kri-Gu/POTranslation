@@ -23,11 +23,13 @@ from src.po_translate_en_to_nb import (
     build_work_items,
     load_context,
     get_defaults,
+    format_glossary_for_prompt,
 )
 from src.xliff_translate import (
     translate_xliff_file,
     build_work_items_xliff,
 )
+from src.cost_estimator import estimate_cost
 import xml.etree.ElementTree as ET
 import polib
 
@@ -156,6 +158,44 @@ def main():
             )
 
         st.divider()
+
+        # ── Glossary / Term protection ─────────────────────────────────────
+        st.subheader("📖 Glossary")
+        st.caption("Terms that must be translated exactly as specified.")
+
+        # Initialise session state for glossary
+        if "glossary" not in st.session_state:
+            st.session_state.glossary = []
+
+        glossary_input = st.text_area(
+            "Glossary entries (one per line: source → target)",
+            height=120,
+            placeholder="lawn mower → gressklipper\nblade speed → knivhastighet\nthrottle → gasspedal",
+            help="Enter one term pair per line, separated by → or =. These terms will be enforced during translation.",
+        )
+
+        # Parse glossary from text input
+        glossary: list = []
+        if glossary_input.strip():
+            for line in glossary_input.strip().splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                # Support → and = as separators
+                for sep in ["→", "=", "->"]:
+                    if sep in line:
+                        parts = line.split(sep, 1)
+                        src = parts[0].strip()
+                        tgt = parts[1].strip()
+                        if src and tgt:
+                            glossary.append({"source": src, "target": tgt})
+                        break
+            st.session_state.glossary = glossary
+
+        if glossary:
+            st.success(f"{len(glossary)} glossary term(s) loaded")
+
+        st.divider()
         st.caption("CLI equivalent shown after translation.")
 
     # ─── Main area: File upload & action ───────────────────────────────────
@@ -199,6 +239,12 @@ def main():
                 estimated_calls = (len(work_items) + eff_batch - 1) // eff_batch if eff_batch else 0
                 st.metric("API calls (est.)", estimated_calls)
 
+                # Cost estimation
+                if work_items:
+                    cost_est = estimate_cost(work_items, model, eff_batch)
+                    st.metric("Est. tokens", f"{cost_est['estimated_total_tokens']:,}")
+                    st.metric("Est. cost", f"${cost_est['estimated_cost_usd']:.4f}")
+
             with st.expander("📄 Preview trans-units to translate", expanded=False):
                 preview_data = []
                 for item in work_items[:100]:
@@ -238,7 +284,7 @@ def main():
             if translate_btn:
                 _run_xliff_translation(
                     tmp_input, model, batch_size, target_lang, source_lang,
-                    force, context_text, uploaded_file.name,
+                    force, context_text, uploaded_file.name, glossary,
                 )
 
         else:
@@ -258,6 +304,12 @@ def main():
                 st.metric("To translate", len(work_items))
                 estimated_calls = (len(work_items) + batch_size - 1) // batch_size
                 st.metric("API calls (est.)", estimated_calls)
+
+                # Cost estimation
+                if work_items:
+                    cost_est = estimate_cost(work_items, model, batch_size)
+                    st.metric("Est. tokens", f"{cost_est['estimated_total_tokens']:,}")
+                    st.metric("Est. cost", f"${cost_est['estimated_cost_usd']:.4f}")
 
             with st.expander("📄 Preview entries to translate", expanded=False):
                 preview_data = []
@@ -301,7 +353,7 @@ def main():
             if translate_btn:
                 _run_translation(
                     tmp_input, model, batch_size, target_lang, source_lang,
-                    force, context_text, uploaded_file.name,
+                    force, context_text, uploaded_file.name, glossary,
                 )
 
     else:
@@ -326,7 +378,7 @@ Placeholders, HTML tags, and XLIFF inline codes (`<g>` elements) are preserved a
 
 def _run_translation(
     tmp_input, model, batch_size, target_lang, source_lang,
-    force, context_text, original_filename,
+    force, context_text, original_filename, glossary=None,
 ):
     """Execute the translation and display results."""
 
@@ -367,6 +419,7 @@ def _run_translation(
             context_file=context_file,
             progress_callback=on_progress,
             log_callback=on_log,
+            glossary=glossary,
         )
     except Exception as e:
         st.error(f"❌ Translation failed: {e}")
@@ -443,7 +496,7 @@ def _run_translation(
 
 def _run_xliff_translation(
     tmp_input, model, batch_size, target_lang, source_lang,
-    force, context_text, original_filename,
+    force, context_text, original_filename, glossary=None,
 ):
     """Execute XLIFF translation and display results."""
 
@@ -483,6 +536,7 @@ def _run_xliff_translation(
             context_file=context_file,
             progress_callback=on_progress,
             log_callback=on_log,
+            glossary=glossary,
         )
     except Exception as e:
         st.error(f"❌ XLIFF translation failed: {e}")
